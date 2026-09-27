@@ -1,0 +1,842 @@
+<title>Soporte Ergonómico de Antebrazo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#0c141e; --bg2:#172536; --panel:rgba(14,23,34,.88); --line:#2a3c52;
+  --text:#e6ecf3; --muted:#93a4b9; --accent:#ffb547; --accent-ink:#1b1204; --navy:#1f3864;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:var(--bg) radial-gradient(ellipse 80% 70% at 50% 42%,var(--bg2) 0%,var(--bg) 72%);color:var(--text);font-family:var(--body);font-size:14px}
+.app{position:relative;height:100%;display:grid;grid-template-rows:auto 1fr auto;pointer-events:none}
+#gl,#lines{position:absolute;inset:0;width:100%;height:100%;display:block}
+#gl{pointer-events:auto;cursor:grab;touch-action:none}
+#gl:active{cursor:grabbing}
+#lines{pointer-events:none}
+#labels{position:absolute;inset:0;pointer-events:none;transition:opacity .3s}
+button,input,a{pointer-events:auto}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:18px 16px 0}
+.eyebrow{margin:0 0 4px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font-family:var(--display);font-stretch:72%;font-weight:750;font-size:clamp(26px,4.2vw,44px);line-height:1;letter-spacing:.005em;text-wrap:balance}
+.sub{margin:6px 0 0;color:var(--muted);font-size:13px;max-width:44ch}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;backdrop-filter:blur(6px)}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
+
+/* stage overlays */
+.stage{position:relative;z-index:2}
+.card{position:absolute;left:16px;bottom:12px;width:min(340px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px 12px;backdrop-filter:blur(8px)}
+.card-head{display:flex;justify-content:space-between;align-items:center}
+.badge{font-family:var(--mono);font-weight:500;font-size:12px;background:var(--accent);color:var(--accent-ink);border-radius:4px;padding:2px 7px}
+.card-count{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.card h2{margin:8px 0 10px;font-family:var(--display);font-stretch:80%;font-size:22px;line-height:1.1;font-weight:700;text-wrap:balance}
+.card dl{margin:0;display:grid;gap:8px}
+.card dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.card dd{margin:2px 0 0;line-height:1.4;font-size:13.5px}
+
+.hud{position:absolute;right:16px;top:8px;width:210px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;backdrop-filter:blur(8px)}
+.hud h3,.readout h3{margin:0 0 10px;font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.gauge{position:relative;height:64px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid var(--line);overflow:hidden}
+.gauge::before{content:"";position:absolute;left:50%;top:6px;bottom:6px;border-left:1px dashed var(--line)}
+.gbar{position:absolute;left:18%;right:18%;top:50%;height:3px;border-radius:2px;transform-origin:50% 50%}
+.gbar.arm{background:var(--muted);margin-top:10px}
+.gbar.tray{background:var(--accent);margin-top:-10px;height:4px}
+.hud-rows{display:grid;grid-template-columns:1fr auto;gap:4px 10px;margin-top:10px;font-size:12.5px}
+.hud-rows b{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+.hud-rows .k-tray{color:var(--accent)}
+.readout{position:absolute;right:16px;top:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;backdrop-filter:blur(8px)}
+.readout .big{font-family:var(--mono);font-size:34px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1}
+.readout .big small{font-size:14px;color:var(--muted);margin-left:4px}
+.readout p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+
+.drawer{position:absolute;right:16px;top:8px;bottom:12px;width:min(380px,calc(100% - 32px));overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;backdrop-filter:blur(10px);pointer-events:auto;z-index:4}
+.drawer h2{margin:0 0 2px;font-family:var(--display);font-stretch:80%;font-size:20px}
+.drawer .src{margin:0 0 12px;font-size:12px;color:var(--muted)}
+.drawer table{width:100%;border-collapse:collapse;font-size:12.5px}
+.drawer th{text-align:left;font-weight:600;color:var(--muted);padding:7px 10px 7px 0;vertical-align:top;width:42%;border-top:1px solid var(--line)}
+.drawer td{padding:7px 0;border-top:1px solid var(--line);line-height:1.4}
+
+/* labels */
+.lbl{position:absolute;top:0;left:0;display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:12.5px;transform:translate(0,-50%);transition:opacity .25s}
+.lbl .n{font-family:var(--mono);font-size:11px;font-weight:500;min-width:22px;text-align:center;padding:2px 4px;border-radius:4px;background:#e6ecf3;color:#0c141e}
+.lbl .t{background:rgba(12,20,30,.72);padding:2px 6px;border-radius:4px}
+.lbl.on .n{background:var(--accent)}
+.lbl.on .t{color:var(--accent)}
+.lbl.dim{opacity:.35}
+.lbl.right{flex-direction:row-reverse}
+.lbl.compact .t{display:none}
+.lbl.compact{transform:translate(-50%,-50%)}
+
+/* footer */
+.bar{position:relative;z-index:3;padding:0 16px 14px;display:grid;gap:10px}
+.caption{margin:0;max-width:66ch;font-size:15px;line-height:1.45;min-height:2.9em;text-shadow:0 1px 8px rgba(0,0,0,.6);text-wrap:pretty}
+.transport{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;backdrop-filter:blur(8px);pointer-events:auto}
+.play{width:34px;height:34px;flex:none;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer;display:grid;place-items:center}
+.track{position:relative;flex:1;min-width:0;height:34px;display:flex;align-items:center}
+.ticks{position:absolute;left:0;right:0;top:50%;height:0;pointer-events:none}
+.ticks i{position:absolute;top:-7px;width:1px;height:14px;background:var(--line)}
+#scrub{width:100%;margin:0;appearance:none;-webkit-appearance:none;background:transparent;height:34px;cursor:pointer;position:relative}
+#scrub::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--accent) var(--p,0%),#2a3c52 var(--p,0%))}
+#scrub::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--accent) var(--p,0%),#2a3c52 var(--p,0%))}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);margin-top:-5px;border:0}
+#scrub::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--text);border:0}
+.time{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+.chapters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;pointer-events:auto}
+.chapters::-webkit-scrollbar{display:none}
+.chap{flex:none;background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;color:var(--muted);cursor:pointer}
+.chap:hover{color:var(--text)}
+.chap.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chap .k{font-family:var(--mono);font-size:10.5px;margin-right:5px;opacity:.7}
+
+@media (max-width:640px){
+  .sub{display:none}
+  .caption{font-size:13.5px}
+  .hud,.readout{top:4px;transform:scale(.9);transform-origin:top right}
+  .card{padding:12px}
+  .card h2{font-size:19px}
+}
+</style>
+
+<div class="app" id="app">
+  <canvas id="gl" aria-label="Vista 3D del soporte de antebrazo. Arrastre para girar la cámara."></canvas>
+  <canvas id="lines"></canvas>
+  <div id="labels"></div>
+
+  <header class="top">
+    <div>
+      <p class="eyebrow">Simulación 3D · Vista explosionada</p>
+      <h1 id="chapTitle">Producto ensamblado</h1>
+      <p class="sub">Soporte ergonómico de antebrazo para el transporte de bandejas en el servicio de mesa</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="camBtn" hidden>Volver a cámara guiada</button>
+      <button class="btn" id="specBtn" aria-expanded="false" aria-controls="drawer">Ficha técnica</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <aside class="card" id="card" hidden>
+      <div class="card-head"><span class="badge" id="cNum">01</span><span class="card-count" id="cCount">1 / 11</span></div>
+      <h2 id="cName">Plataforma portabandeja</h2>
+      <dl>
+        <div id="cMatRow"><dt>Material</dt><dd id="cMat"></dd></div>
+        <div><dt>Función</dt><dd id="cFn"></dd></div>
+        <div id="cSpecRow"><dt>Dato técnico</dt><dd id="cSpec"></dd></div>
+      </dl>
+    </aside>
+
+    <div class="hud" id="hud" hidden>
+      <h3>Rótula autonivelante</h3>
+      <div class="gauge"><div class="gbar tray" id="gTray"></div><div class="gbar arm" id="gArm"></div></div>
+      <div class="hud-rows">
+        <span>Antebrazo</span><b id="vArm">0.0°</b>
+        <span class="k-tray">Bandeja</span><b class="k-tray" id="vTray">0.0°</b>
+        <span>Límite de compensación</span><b>±8°</b>
+      </div>
+    </div>
+
+    <div class="readout" id="readout" hidden>
+      <h3>Longitud total</h3>
+      <div class="big"><span id="vLen">320</span><small>mm</small></div>
+      <p>Tramo telescópico de 68 mm con pasador</p>
+    </div>
+
+    <aside class="drawer" id="drawer" hidden>
+      <h2>Ficha técnica</h2>
+      <p class="src">Tabla 7 · Ficha técnica del producto propuesto</p>
+      <table>
+        <tr><th>Longitud total</th><td>320 mm retraído a 360 mm extendido (tramo telescópico de 68 mm con pasador)</td></tr>
+        <tr><th>Ancho de la cuna</th><td>112 mm exteriores; radio interior de 50 mm</td></tr>
+        <tr><th>Altura de la cuna</th><td>56 mm desde la base hasta el borde superior</td></tr>
+        <tr><th>Altura total</th><td>141 mm hasta el borde de la plataforma; 131 mm hasta la superficie de apoyo</td></tr>
+        <tr><th>Plataforma portabandeja</th><td>280 mm × 160 mm, espesor de 10 mm, con reborde perimetral de 10 mm</td></tr>
+        <tr><th>Compensación de la rótula</th><td>±8° de inclinación, con amortiguación por resorte</td></tr>
+        <tr><th>Acolchado interior</th><td>Espuma EVA de 10 mm con forro en malla desmontable y lavable</td></tr>
+        <tr><th>Rango de ajuste de correas</th><td>Circunferencia de antebrazo de 220 mm a 340 mm</td></tr>
+        <tr><th>Capacidad de carga nominal</th><td>8 kg, con ensayo estructural previsto a 12 kg</td></tr>
+        <tr><th>Peso del producto</th><td>≤ 450 g</td></tr>
+        <tr><th>Resistencia térmica de la plataforma</th><td>Contacto puntual hasta 90 °C sin transmisión al antebrazo</td></tr>
+        <tr><th>Ventilación</th><td>Doce orificios de 11 mm en las paredes laterales de la cuna</td></tr>
+        <tr><th>Costo objetivo de producción</th><td>≤ COP 90.000 por unidad en lote de 100 unidades</td></tr>
+      </table>
+    </aside>
+  </main>
+
+  <footer class="bar">
+    <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="transport">
+      <button class="play" id="play" aria-label="Pausar">
+        <svg id="icoPause" width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
+        <svg id="icoPlay" width="14" height="14" viewBox="0 0 14 14" fill="currentColor" style="display:none"><path d="M3 1.5v11a.8.8 0 0 0 1.2.7l9-5.5a.8.8 0 0 0 0-1.4l-9-5.5A.8.8 0 0 0 3 1.5z"/></svg>
+      </button>
+      <div class="track"><div class="ticks" id="ticks"></div><input type="range" id="scrub" min="0" max="72" step="0.01" value="0" aria-label="Línea de tiempo"></div>
+      <span class="time" id="time">00:00 / 01:12</span>
+    </div>
+    <nav class="chapters" id="chapters" aria-label="Capítulos"></nav>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+// ---------------------------------------------------------------- data
+const TOTAL = 72;
+const CH = [
+  {k:'A', t:0,  name:'Producto ensamblado'},
+  {k:'B', t:5,  name:'Vista explosionada'},
+  {k:'C', t:9,  name:'Componentes'},
+  {k:'D', t:31, name:'Ensamblaje'},
+  {k:'E', t:35, name:'Características'},
+  {k:'F', t:47, name:'Colocación'},
+  {k:'G', t:52, name:'En servicio'},
+];
+const CAPS = [
+  [0,5,'Una cuna semicilíndrica envuelve la cara inferior del antebrazo y sostiene una plataforma antideslizante sobre la que se ubica la bandeja.'],
+  [5,9,'Vista explosionada: 11 componentes, desde los tacos de la plataforma hasta la copa de codo.'],
+  [9,31,''],
+  [31,35,'Ensamblaje: la plataforma se monta sobre la cuna a través de dos montantes y una rótula amortiguada.'],
+  [35,39,'Rótula amortiguada: compensa hasta ±8° de inclinación y mantiene la bandeja nivelada.'],
+  [39,43,'Tramo telescópico con pasador: la longitud pasa de 320 mm a 360 mm según la talla del usuario.'],
+  [43,47,'Correas de nailon de 50 mm con hebilla de liberación rápida: se abren y se cierran con una sola mano.'],
+  [47,52,'Colocación: el antebrazo entra en la cuna, el codo apoya en la copa y las correas se cierran.'],
+  [52,60,'La bandeja ya no carga sobre la palma. El peso se reparte a lo largo del cúbito y pasa al codo y al hombro. Carga nominal: 8 kg.'],
+  [60,67,'Durante la marcha y los giros, la rótula compensa el balanceo del brazo y la bandeja sigue horizontal.'],
+  [67,72.1,'Para el personal de servicio de mesa en restaurantes, hoteles y empresas de eventos.'],
+];
+const PARTS = [
+  {n:1, short:'Plataforma portabandeja', name:'Plataforma portabandeja', mat:'Polipropileno con barrera térmica interna', fn:'Recibe y sostiene la bandeja; el reborde perimetral impide que se deslice al frenar o girar.', spec:'280 × 160 mm · espesor 10 mm · reborde perimetral de 10 mm'},
+  {n:2, short:'Cubierta de silicona', name:'Cubierta de silicona antideslizante', mat:'Silicona alimentaria antideslizante', fn:'Aumenta la fricción entre la bandeja y la plataforma.', spec:'Alto coeficiente de fricción, resistente a temperatura y lavable'},
+  {n:3, short:'Rótula amortiguada', name:'Rótula autonivelante amortiguada', mat:'Poliamida con buje de POM y resorte de acero inoxidable', fn:'Compensa hasta ±8° de inclinación y mantiene la bandeja horizontal durante la marcha.', spec:'±8° de inclinación con amortiguación por resorte'},
+  {n:4, short:'Montantes de apoyo (x2)', name:'Montantes de apoyo (x2)', mat:'Poliamida con buje de POM', fn:'Transmiten la carga de la plataforma a la cuna y controlan el giro lateral.', spec:'Bajo rozamiento y resistencia a la corrosión'},
+  {n:5, short:'Cuna estructural', name:'Cuna estructural del antebrazo', mat:'Poliamida reforzada con fibra de vidrio (PA6-GF30) o polipropileno copolímero', fn:'Envuelve la cara inferior del antebrazo y distribuye la carga a lo largo del hueso.', spec:'112 mm exteriores · radio interior 50 mm · altura 56 mm · 12 orificios de 11 mm'},
+  {n:6, short:'Acolchado EVA', name:'Acolchado EVA con forro en malla', mat:'Espuma EVA de 10 mm con forro en malla técnica', fn:'Amortigua la presión sobre el antebrazo y permite la ventilación.', spec:'Desmontable y lavable'},
+  {n:7, short:'Copa de codo', name:'Copa de codo', mat:'Poliamida reforzada con fibra de vidrio (PA6-GF30) o polipropileno copolímero', fn:'Transfiere al codo la carga acumulada y evita el desplazamiento del soporte hacia adelante.', spec:''},
+  {n:8, short:'Tramo telescópico', name:'Tramo telescópico con pasador', mat:'', fn:'Ajusta la longitud del soporte a la talla del usuario.', spec:'Recorrido de 68 mm · longitud de 320 a 360 mm'},
+  {n:9, short:'Correas con hebilla (x2)', name:'Correas con hebilla de liberación rápida (x2)', mat:'Cinta de nailon de 50 mm con hebilla de liberación rápida', fn:'Fijan el soporte al antebrazo y permiten colocarlo o retirarlo con una sola mano.', spec:'Circunferencia de antebrazo de 220 a 340 mm'},
+  {n:10, short:'Tacos antideslizantes', name:'Tacos antideslizantes de la plataforma', mat:'', fn:'Estabilizan la bandeja y amortiguan las vibraciones de la marcha.', spec:''},
+  {n:11, short:'Barrera térmica', name:'Barrera térmica de la plataforma', mat:'Barrera térmica interna de la plataforma de polipropileno', fn:'Aísla el antebrazo del calor transmitido por los platos.', spec:'Contacto puntual hasta 90 °C sin transmisión al antebrazo'},
+];
+
+// ---------------------------------------------------------------- utils
+const clamp = (x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp = (a,b,k)=>a+(b-a)*k;
+const sm = x=>{x=clamp(x);return x*x*(3-2*x);};
+const ramp = (t,a,d)=>sm((t-a)/d);
+const pulse = (t,a,da,b,db)=>ramp(t,a,da)*(1-ramp(t,b,db));
+const DEG = Math.PI/180;
+const V3 = (x,y,z)=>new THREE.Vector3(x,y,z);
+const UP = V3(0,1,0);
+function bounceOut(x){const n=7.5625,d=2.75;if(x<1/d)return n*x*x;if(x<2/d)return n*(x-=1.5/d)*x+.75;if(x<2.5/d)return n*(x-=2.25/d)*x+.9375;return n*(x-=2.625/d)*x+.984375;}
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------------------------------------------------------------- renderer
+const app = document.getElementById('app');
+const glCanvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({canvas:glCanvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0f1824, 70, 170);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 400);
+camera.position.set(-3,2.5,-6);
+const controls = new THREE.OrbitControls(camera, glCanvas);
+controls.enableDamping = true;
+controls.enablePan = false;
+let autoCam = true;
+const camBtn = document.getElementById('camBtn');
+controls.addEventListener('start', ()=>{ autoCam=false; camBtn.hidden=false; });
+camBtn.addEventListener('click', ()=>{ autoCam=true; camBtn.hidden=true; });
+
+scene.add(new THREE.HemisphereLight(0xd6e4ff, 0x2a2018, 0.75));
+const key = new THREE.DirectionalLight(0xfff3e2, 2.1);
+key.castShadow = true;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.02;
+scene.add(key, key.target);
+const rim = new THREE.DirectionalLight(0x8fb4ff, 0.9);
+scene.add(rim, rim.target);
+let shadowSize = 0;
+function setShadow(s){ if(s===shadowSize) return; shadowSize=s; const c=key.shadow.camera; c.left=-s;c.right=s;c.top=s;c.bottom=-s;c.near=0.5;c.far=s*8;c.updateProjectionMatrix(); }
+
+// ---------------------------------------------------------------- geometry helpers
+function halfShell(rIn,rOut,len){
+  const s = new THREE.Shape();
+  s.absarc(0,0,rOut,Math.PI,2*Math.PI,false);
+  s.absarc(0,0,rIn,2*Math.PI,Math.PI,true);
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s,{depth:len,bevelEnabled:false,curveSegments:48});
+  g.translate(0,0,-len/2); g.rotateY(Math.PI/2);
+  return g;
+}
+function rrect(w,h,r){
+  const s=new THREE.Shape(), x=-w/2, y=-h/2;
+  s.moveTo(x+r,y); s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r);
+  s.lineTo(x+w,y+h-r); s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y);
+  return s;
+}
+function slab(w,d,t,r,hole){
+  const s = rrect(w,d,r);
+  if(hole) s.holes.push(rrect(hole[0],hole[1],hole[2]));
+  const g = new THREE.ExtrudeGeometry(s,{depth:t,bevelEnabled:false,curveSegments:10});
+  g.rotateX(-Math.PI/2);
+  return g;
+}
+class Helix extends THREE.Curve{
+  constructor(r,h,turns,y0){super();this.r=r;this.h=h;this.turns=turns;this.y0=y0;}
+  getPoint(u,target=new THREE.Vector3()){const a=u*this.turns*Math.PI*2;return target.set(Math.cos(a)*this.r,this.y0+u*this.h,Math.sin(a)*this.r);}
+}
+function canvasTex(size,draw,rep){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  draw(c.getContext('2d'),size);
+  const tx=new THREE.CanvasTexture(c); tx.encoding=THREE.sRGBEncoding;
+  tx.wrapS=tx.wrapT=THREE.RepeatWrapping; if(rep) tx.repeat.set(rep[0],rep[1]);
+  tx.anisotropy=4; return tx;
+}
+function addMesh(parent,geo,mat,x=0,y=0,z=0){
+  const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z);
+  m.castShadow=true; m.receiveShadow=true; parent.add(m); return m;
+}
+
+// ---------------------------------------------------------------- product
+const product = new THREE.Group(); scene.add(product);
+const PIV_Y = 0.60;
+const tilt = new THREE.Group(); tilt.position.set(0,PIV_Y,0); product.add(tilt);
+const P = {};
+function part(n,off){ P[n]={n,off:V3(...off),groups:[],mats:[],op:1,center:null}; }
+function pgroup(n,parent){ const g=new THREE.Group(); parent.add(g); P[n].groups.push({g,base:g.position.clone()}); return g; }
+function pmat(n,o){ const m=new THREE.MeshStandardMaterial(o); P[n].mats.push(m); m.userData.baseEm=m.emissive.clone(); return m; }
+
+// explode offsets (units: 1 = 100 mm)
+part(1,[0,2.7,0]); part(2,[0,3.5,0]); part(3,[0,1.35,0]); part(4,[0,0.72,0]);
+part(5,[0,0,0]);   part(6,[0,-0.15,-1.7]); part(7,[-1.35,0,0]); part(8,[1.35,0,0]);
+part(9,[0,0.35,1.9]); part(10,[0,4.25,0]); part(11,[0,2.0,0]);
+
+// 5 · cuna
+{
+  const g=pgroup(5,product);
+  const m=pmat(5,{color:0x3c434c,roughness:.5,metalness:.05});
+  addMesh(g,halfShell(.50,.56,2.3),m,-0.05,0,0);
+  const holeM=pmat(5,{color:0x07090c,roughness:.9});
+  const hg=new THREE.CircleGeometry(.055,20);
+  [-0.95,-0.57,-0.19,0.19,0.57,0.95].forEach(x=>{
+    [-30,-150].forEach(a=>{
+      const r=.563, y=r*Math.sin(a*DEG), z=-r*Math.cos(a*DEG);
+      const h=new THREE.Mesh(hg,holeM); h.position.set(x,y,z);
+      h.lookAt(x,y*2,z*2); g.add(h);
+    });
+  });
+}
+// 6 · acolchado EVA
+{
+  const g=pgroup(6,product);
+  const tx=canvasTex(128,(c,s)=>{
+    c.fillStyle='#3e8a86';c.fillRect(0,0,s,s);
+    c.strokeStyle='rgba(255,255,255,.22)';c.lineWidth=3;
+    for(let i=-s;i<s*2;i+=16){c.beginPath();c.moveTo(i,0);c.lineTo(i+s,s);c.stroke();c.beginPath();c.moveTo(i,s);c.lineTo(i+s,0);c.stroke();}
+  },[10,4]);
+  const m=pmat(6,{color:0xffffff,map:tx,roughness:.95});
+  addMesh(g,halfShell(.40,.495,2.1),m,-0.1,0,0);
+}
+// 7 · copa de codo
+{
+  const g=pgroup(7,product);
+  const m=pmat(7,{color:0x3c434c,roughness:.5,metalness:.05,side:THREE.DoubleSide});
+  addMesh(g,new THREE.SphereGeometry(.56,40,20,-Math.PI/2,Math.PI,Math.PI/2,Math.PI/2),m,-1.2,0,0);
+  const pad=pmat(7,{color:0x3e8a86,roughness:.95,side:THREE.DoubleSide});
+  addMesh(g,new THREE.SphereGeometry(.50,32,16,-Math.PI/2,Math.PI,Math.PI/2,Math.PI/2),pad,-1.2,0,0);
+}
+// 8 · tramo telescópico
+{
+  const g=pgroup(8,product);
+  const m=pmat(8,{color:0x535c67,roughness:.45,metalness:.1});
+  addMesh(g,halfShell(.565,.60,.7),m,1.1,0,0);
+  const pin=pmat(8,{color:0xd4dbe2,roughness:.25,metalness:1});
+  P[8].pin=addMesh(g,new THREE.CylinderGeometry(.035,.035,.16,14),pin,.95,-.64,0);
+  addMesh(g,new THREE.CylinderGeometry(.06,.06,.02,18),pin,.95,-.72,0);
+}
+// 9 · correas
+{
+  const g=pgroup(9,product);
+  const band=pmat(9,{color:0x1f3864,roughness:.8,side:THREE.DoubleSide});
+  const buckle=pmat(9,{color:0x15171a,roughness:.4});
+  const bg=new THREE.CylinderGeometry(.46,.46,.5,40,1,true,0,Math.PI); bg.rotateZ(Math.PI/2);
+  P[9].pivots=[-0.55,0.6].map(x=>{
+    const pv=new THREE.Group(); pv.position.set(x,0,-.46); g.add(pv);
+    addMesh(pv,bg,band,0,0,.46);
+    addMesh(pv,new THREE.BoxGeometry(.2,.07,.24),buckle,0,.47,.46);
+    addMesh(pv,new THREE.BoxGeometry(.12,.03,.1),buckle,0,.515,.40);
+    return pv;
+  });
+}
+// 4 · montantes
+{
+  const g=pgroup(4,product);
+  const m=pmat(4,{color:0x2c333b,roughness:.45,metalness:.05});
+  const pom=pmat(4,{color:0xf1efe8,roughness:.35});
+  const ag=new THREE.TorusGeometry(.53,.03,10,48,Math.PI); ag.rotateY(Math.PI/2);
+  const bush=new THREE.CylinderGeometry(.055,.055,.1,16); bush.rotateZ(Math.PI/2);
+  [-0.5,0.55].forEach(x=>{
+    addMesh(g,ag,m,x,0,0);
+    addMesh(g,bush,pom,x,0,.53); addMesh(g,bush,pom,x,0,-.53);
+  });
+  addMesh(g,new THREE.BoxGeometry(1.15,.05,.12),m,.025,.53,0);
+}
+// 3 · rótula (base fija + casquillo en la plataforma)
+{
+  const g=pgroup(3,product);
+  const steel=pmat(3,{color:0xcfd6dc,roughness:.25,metalness:1});
+  const pa=pmat(3,{color:0x2c333b,roughness:.45});
+  addMesh(g,new THREE.CylinderGeometry(.025,.025,.06,12),steel,0,.575,0);
+  addMesh(g,new THREE.TubeGeometry(new Helix(.075,.06,5,.555),160,.008,6),steel);
+  addMesh(g,new THREE.SphereGeometry(.06,24,16),steel,0,.60,0);
+  addMesh(g,new THREE.CylinderGeometry(.1,.1,.02,24),pa,0,.56,0);
+  const g2=pgroup(3,tilt);
+  const pom=pmat(3,{color:0xf1efe8,roughness:.35});
+  addMesh(g2,new THREE.CylinderGeometry(.14,.12,.045,28),pom,0,0,0);
+}
+// 11 · barrera térmica
+{
+  const g=pgroup(11,tilt);
+  const tx=canvasTex(128,(c,s)=>{
+    c.fillStyle='#c7b27a';c.fillRect(0,0,s,s);c.strokeStyle='rgba(60,45,10,.35)';c.lineWidth=2;
+    const r=12,h=r*Math.sqrt(3);
+    for(let y=-h;y<s+h;y+=h)for(let x=-r*3;x<s+r*3;x+=r*3){[[x,y],[x+r*1.5,y+h/2]].forEach(([cx,cy])=>{c.beginPath();for(let i=0;i<7;i++){const a=i*Math.PI/3;c.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a));}c.stroke();});}
+  },[6,3.5]);
+  const m=pmat(11,{color:0xffffff,map:tx,roughness:.35,metalness:.75});
+  addMesh(g,slab(2.7,1.5,.025,.16),m,0,.02,0);
+}
+// 1 · plataforma
+{
+  const g=pgroup(1,tilt);
+  const m=pmat(1,{color:0xe7e4dc,roughness:.55});
+  addMesh(g,slab(2.8,1.6,.10,.18),m,0,.05,0);
+  addMesh(g,slab(2.8,1.6,.10,.18,[2.64,1.44,.12]),m,0,.15,0);
+}
+// 2 · cubierta de silicona
+{
+  const g=pgroup(2,tilt);
+  const m=pmat(2,{color:0xd4613f,roughness:.8});
+  addMesh(g,slab(2.62,1.42,.02,.11),m,0,.15,0);
+}
+// 10 · tacos
+{
+  const g=pgroup(10,tilt);
+  const m=pmat(10,{color:0x17191c,roughness:.9});
+  const tg=new THREE.CylinderGeometry(.1,.11,.085,20);
+  [[1,.5],[1,-.5],[-1,.5],[-1,-.5]].forEach(([x,z])=>addMesh(g,tg,m,x,.2125,z));
+}
+// bandeja con servicio (no es componente)
+const tray = new THREE.Group(); tilt.add(tray);
+{
+  const trayM=new THREE.MeshStandardMaterial({color:0x2a2f36,roughness:.45,metalness:.3});
+  addMesh(tray,slab(4.4,3.0,.05,.4),trayM,0,0,0);
+  addMesh(tray,slab(4.4,3.0,.14,.4,[4.25,2.85,.33]),trayM,0,.05,0);
+  const porc=new THREE.MeshStandardMaterial({color:0xf6f4ef,roughness:.3});
+  const plate=new THREE.LatheGeometry([V3(0,0,0),V3(.7,0,0),V3(.8,.04,0),V3(1.0,.1,0),V3(1.02,.12,0)].map(v=>new THREE.Vector2(v.x,v.y)),40);
+  addMesh(tray,plate,porc,-.95,.06,.35);
+  addMesh(tray,new THREE.SphereGeometry(.45,24,14),new THREE.MeshStandardMaterial({color:0xb86434,roughness:.7}),-1.0,.12,.35).scale.set(1,.35,.8);
+  [[-.6,.15],[-1.2,.65],[-.7,.75]].forEach(([x,z])=>addMesh(tray,new THREE.SphereGeometry(.13,12,8),new THREE.MeshStandardMaterial({color:0x5f8f3a,roughness:.8}),x,.2,z));
+  const bowl=new THREE.LatheGeometry([[0,0],[.35,0],[.55,.12],[.68,.38],[.7,.4]].map(p=>new THREE.Vector2(p[0],p[1])),40);
+  const bowlM=porc.clone(); bowlM.side=THREE.DoubleSide;
+  addMesh(tray,bowl,bowlM,1.05,.06,.5);
+  addMesh(tray,new THREE.CircleGeometry(.6,32),new THREE.MeshStandardMaterial({color:0xc98a2e,roughness:.4}),1.05,.38,.5).rotation.x=-Math.PI/2;
+  const glassM=new THREE.MeshPhysicalMaterial({color:0xdfefff,roughness:.05,transmission:.9,transparent:true,opacity:.45,side:THREE.DoubleSide});
+  const glass=new THREE.LatheGeometry([[0,0],[.28,0],[.3,.02],[.05,.06],[.04,.7],[.3,.9],[.36,1.3],[.34,1.55]].map(p=>new THREE.Vector2(p[0],p[1])),32);
+  const gm=addMesh(tray,glass,glassM,.9,.06,-.75); gm.castShadow=false;
+  addMesh(tray,new THREE.CylinderGeometry(.3,.22,.28,24),new THREE.MeshStandardMaterial({color:0x6b1424,roughness:.2}),.9,.93,-.75);
+}
+tray.position.set(.3,.255,0);
+
+// label anchors in part-local coordinates
+product.updateMatrixWorld(true);
+for(const n in P){
+  const box=new THREE.Box3(); P[n].groups.forEach(({g})=>box.expandByObject(g));
+  const c=box.getCenter(new THREE.Vector3());
+  if(+n===9) c.y=box.max.y;
+  if(+n===4) c.set(-0.5,0.4,-0.4);
+  P[n].center=P[n].groups[0].g.worldToLocal(c);
+}
+function anchorWorld(n){ return P[n].groups[0].g.localToWorld(P[n].center.clone()); }
+
+// studio ground
+const studio = new THREE.Group(); scene.add(studio);
+const shadowM = new THREE.ShadowMaterial({opacity:.38,transparent:true});
+const sg = new THREE.Mesh(new THREE.CircleGeometry(9,64),shadowM); sg.rotation.x=-Math.PI/2; sg.position.y=-.62; sg.receiveShadow=true; studio.add(sg);
+const ringM = new THREE.MeshBasicMaterial({color:0xffb547,transparent:true,opacity:.22});
+const ring = new THREE.Mesh(new THREE.RingGeometry(3.6,3.63,128),ringM); ring.rotation.x=-Math.PI/2; ring.position.y=-.615; studio.add(ring);
+const ring2M = new THREE.MeshBasicMaterial({color:0x93a4b9,transparent:true,opacity:.1});
+const ring2 = new THREE.Mesh(new THREE.RingGeometry(2.2,2.215,128),ring2M); ring2.rotation.x=-Math.PI/2; ring2.position.y=-.615; studio.add(ring2);
+
+// ---------------------------------------------------------------- figure (camarero)
+const FLOOR = -10.7, R = 20, SPEED = 8;
+const ANCH = V3(2.1,10.7,-3.0);           // anclaje del soporte en coordenadas locales de la figura
+const P0 = V3(-ANCH.x, FLOOR, -ANCH.z);    // posición de la figura cuando el soporte está en el origen
+const CEN = V3(P0.x, FLOOR, P0.z+R);       // centro del recorrido (mesa central)
+
+const fig = new THREE.Group(); scene.add(fig);
+const figMats=[];
+function fmat(c,r=.7){const m=new THREE.MeshStandardMaterial({color:c,roughness:r,transparent:true,opacity:0});figMats.push(m);return m;}
+const mShirt=fmat(0xebe8e1,.8), mVest=fmat(0x1b2530,.6), mTrou=fmat(0x14181e,.8), mSkin=fmat(0xc4a78d,.55), mShoe=fmat(0x0a0b0d,.3);
+function cap(r,len,mat,parent=fig){const m=new THREE.Mesh(new THREE.CapsuleGeometry(r,len,6,16),mat);m.castShadow=true;m.userData.len=len;parent.add(m);return m;}
+function setLimb(m,a,b){const d=new THREE.Vector3().subVectors(b,a);const L=d.length();m.position.copy(a).addScaledVector(d,.5);m.quaternion.setFromUnitVectors(UP,d.normalize());m.scale.set(1,L/m.userData.len,1);}
+const torso=cap(1.45,1.8,mVest); torso.scale.set(.72,1,1.15);
+const bib=addMesh(fig,new THREE.BoxGeometry(.1,1.5,.8),mShirt);
+const pelvis=cap(1.1,1.3,mTrou); pelvis.rotation.x=Math.PI/2; pelvis.scale.set(.75,1,.8);
+const neck=addMesh(fig,new THREE.CylinderGeometry(.42,.48,.9,16),mSkin);
+const head=addMesh(fig,new THREE.SphereGeometry(1.05,32,20),mSkin);
+const bow=new THREE.Group(); fig.add(bow);
+{const cg=new THREE.ConeGeometry(.2,.38,12);const a=addMesh(bow,cg,mTrou,0,0,.19);a.rotation.x=-Math.PI/2;const b=addMesh(bow,cg,mTrou,0,0,-.19);b.rotation.x=Math.PI/2;}
+const thighL=cap(.62,4.3,mTrou), shinL=cap(.5,4.3,mTrou), thighR=cap(.62,4.3,mTrou), shinR=cap(.5,4.3,mTrou);
+const footL=addMesh(fig,new THREE.BoxGeometry(1.3,.42,.62),mShoe), footR=addMesh(fig,new THREE.BoxGeometry(1.3,.42,.62),mShoe);
+const upperL=cap(.44,3.23,mShirt), upperR=cap(.44,3.1,mShirt), foreR=cap(.38,2.6,mShirt);
+const handR=addMesh(fig,new THREE.SphereGeometry(.4,16,12),mSkin);
+const foreG=new THREE.Group(); fig.add(foreG);
+const foreMesh=new THREE.Group(); foreG.add(foreMesh);
+{const g=new THREE.CapsuleGeometry(.38,2.6,6,16); g.rotateZ(-Math.PI/2); addMesh(foreMesh,g,mShirt,1.2,0,0);
+ addMesh(foreMesh,new THREE.BoxGeometry(.95,.3,.75),mSkin,3.05,-.05,0);}
+const anchor=new THREE.Object3D(); anchor.position.set(1.2,0,0); foreG.add(anchor);
+
+function walkDist(t){const u=t-52;if(u<=0)return 0;if(u<2)return u*u/4;return u-1;}
+function rootAt(t){
+  const d=walkDist(t)*SPEED, a=-Math.PI/2+d/R;
+  return {pos:V3(CEN.x+R*Math.cos(a),FLOOR,CEN.z+R*Math.sin(a)), head:Math.atan2(-Math.cos(a),-Math.sin(a)), a, phase:2*Math.PI*d/13, walk:clamp((t-52)/2)};
+}
+const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
+function poseFigure(t, wob, ins){
+  const r=rootAt(t), w=r.walk, ph=r.phase;
+  fig.position.copy(r.pos); fig.rotation.set(0,r.head,0);
+  const pd=w*.12*Math.cos(2*ph);
+  torso.position.set(0,11.9+pd,0);
+  bib.position.set(.98,13.3+pd,0);
+  pelvis.position.set(0,9.35+pd,0);
+  neck.position.set(.05,14.6+pd,0);
+  head.position.set(.1,15.85+pd,0);
+  bow.position.set(.95,14.25+pd,0);
+  // piernas
+  const leg=(side,sw,bend,thigh,shin,foot)=>{
+    const hip=V3(0,9.2+pd,side*.8), L=4.3;
+    const knee=V3(hip.x+L*Math.sin(sw),hip.y-L*Math.cos(sw),hip.z);
+    const b=sw-bend, ank=V3(knee.x+L*Math.sin(b),knee.y-L*Math.cos(b),knee.z);
+    setLimb(thigh,hip,knee); setLimb(shin,knee,ank);
+    foot.position.set(ank.x+.38,ank.y-.3,ank.z); foot.rotation.z=b*.35;
+  };
+  const s=Math.sin(ph), c=Math.cos(ph);
+  leg(-1, w*.42*s, w*.8*Math.max(0,c), thighL, shinL, footL);
+  leg( 1,-w*.42*s, w*.8*Math.max(0,-c), thighR, shinR, footR);
+  // brazo derecho libre
+  const aR=-w*.32*s;
+  const sR=V3(0,13.7+pd,2.2), eR=V3(sR.x+3.1*Math.sin(aR),sR.y-3.1*Math.cos(aR),2.45);
+  const wR=V3(eR.x+2.6*Math.sin(aR+.35),eR.y-2.6*Math.cos(aR+.35),2.55);
+  setLimb(upperR,sR,eR); setLimb(foreR,eR,wR); handR.position.copy(wR).add(V3(.15,-.35,0));
+  // brazo izquierdo con soporte
+  const sL=V3(0,13.7+pd,-2.2), eL=V3(ANCH.x-1.2,ANCH.y+pd,ANCH.z);
+  foreG.position.copy(eL); foreG.quaternion.copy(wob);
+  foreMesh.position.set(0,ins,0);
+  setLimb(upperL,sL,V3(eL.x,eL.y+ins,eL.z));
+  return r;
+}
+
+// ---------------------------------------------------------------- restaurante
+const rest = new THREE.Group(); scene.add(rest);
+const restMats=[];
+function rmat(o){const m=new THREE.MeshStandardMaterial(Object.assign({transparent:true,opacity:0},o));restMats.push(m);return m;}
+{
+  const tx=canvasTex(512,(c,s)=>{
+    c.fillStyle='#3a2e25';c.fillRect(0,0,s,s);
+    for(let i=0;i<8;i++){c.fillStyle=`hsl(26,${22+(i*7)%10}%,${17+(i*5)%6}%)`;c.fillRect(0,i*s/8+1,s,s/8-2);}
+    c.fillStyle='rgba(0,0,0,.35)';for(let i=0;i<8;i++){const x=(i*173)%s;c.fillRect(x,i*s/8,2,s/8);}
+  },[14,14]);
+  const floor=new THREE.Mesh(new THREE.CircleGeometry(95,72),rmat({color:0xffffff,map:tx,roughness:.85}));
+  floor.rotation.x=-Math.PI/2; floor.position.set(CEN.x,FLOOR,CEN.z); floor.receiveShadow=true; rest.add(floor);
+  const cloth=rmat({color:0xf3f1ec,roughness:.9}), wood=rmat({color:0x5a3e2b,roughness:.6}), dark=rmat({color:0x1a1e24,roughness:.5});
+  const porc=rmat({color:0xffffff,roughness:.3}), lampM=rmat({color:0xffd9a0,emissive:0xffb85c,emissiveIntensity:1.6});
+  function table(x,z,rot){
+    const g=new THREE.Group(); g.position.set(x,FLOOR,z); g.rotation.y=rot; rest.add(g);
+    addMesh(g,new THREE.CylinderGeometry(4.3,4.3,.2,48),cloth,0,7.5,0);
+    addMesh(g,new THREE.CylinderGeometry(4.35,4.6,1.7,48,1,true),cloth,0,6.6,0);
+    addMesh(g,new THREE.CylinderGeometry(.35,.35,6,16),dark,0,3.5,0);
+    addMesh(g,new THREE.CylinderGeometry(1.8,2,.25,32),dark,0,.12,0);
+    for(let k=0;k<4;k++){
+      const a=k*Math.PI/2+Math.PI/4, cx=Math.cos(a)*5.6, cz=Math.sin(a)*5.6;
+      const ch=new THREE.Group(); ch.position.set(cx,0,cz); ch.rotation.y=-a+Math.PI/2; g.add(ch);
+      addMesh(ch,new THREE.BoxGeometry(3.4,.35,3.4),wood,0,4.6,0);
+      addMesh(ch,new THREE.BoxGeometry(3.4,4.2,.3),wood,0,6.8,1.6);
+      [[-1.4,-1.4],[1.4,-1.4],[-1.4,1.4],[1.4,1.4]].forEach(([lx,lz])=>addMesh(ch,new THREE.BoxGeometry(.25,4.5,.25),wood,lx,2.25,lz));
+      addMesh(g,new THREE.CylinderGeometry(1.0,.8,.08,28),porc,Math.cos(a)*2.9,7.65,Math.sin(a)*2.9);
+    }
+    addMesh(g,new THREE.SphereGeometry(.7,16,12),lampM,0,19,0).castShadow=false;
+    addMesh(g,new THREE.CylinderGeometry(.03,.03,8,6),dark,0,23,0).castShadow=false;
+  }
+  table(CEN.x,CEN.z,.3);
+  for(let k=0;k<7;k++){const a=k/7*Math.PI*2+.4, rr=k%2?46:40; table(CEN.x+Math.cos(a)*rr,CEN.z+Math.sin(a)*rr,a);}
+}
+
+// flechas de carga
+const arrowM = new THREE.MeshBasicMaterial({color:0xffb547,transparent:true,opacity:0,depthTest:false});
+function mkArrow(){const g=new THREE.Group();const sh=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1,12),arrowM);const hd=new THREE.Mesh(new THREE.ConeGeometry(.26,.6,16),arrowM);sh.renderOrder=hd.renderOrder=10;g.add(sh,hd);g.userData={sh,hd};scene.add(g);return g;}
+const arrows=[mkArrow(),mkArrow(),mkArrow()];
+function setArrow(a,from,to){const d=new THREE.Vector3().subVectors(to,from);const L=d.length();const dir=d.clone().normalize();a.position.copy(from);a.quaternion.setFromUnitVectors(UP,dir);a.userData.sh.scale.set(1,L-.6,1);a.userData.sh.position.y=(L-.6)/2;a.userData.hd.position.y=L-.3;}
+
+// ---------------------------------------------------------------- state
+let fit=1;
+const Qid=new THREE.Quaternion(), Qw=new THREE.Quaternion(), Qinv=new THREE.Quaternion(), Qtmp=new THREE.Quaternion();
+const eul=new THREE.Euler();
+const accent=new THREE.Color(0xffb547);
+const state={e:0,focus:0,focusAmt:0,labels:0,pitch:0,tray:0,len:320};
+
+function tourIndex(t){return clamp(Math.floor((t-9)/2),0,10);}
+
+function applyState(t,dt){
+  const e = t<5?0 : t<8?sm((t-5)/3) : t<31?1 : t<34.5?1-sm((t-31)/3.5) : 0;
+  state.e=e;
+  const ext = pulse(t,39.5,1.0,42.1,.8)*0.4;
+  state.len=Math.round(320+ext*100);
+  // explosión
+  for(const n in P){
+    const p=P[n];
+    p.groups.forEach(({g,base})=>{g.position.copy(base).addScaledVector(p.off,e);});
+    if(+n===8){ p.groups[0].g.position.x+=ext; p.pin.position.y=-.64-.06*(pulse(t,39.2,.3,39.6,.3)+pulse(t,41.8,.3,42.2,.3)); }
+  }
+  // correas
+  const sa=Math.max(pulse(t,43.4,.7,45.4,.7), (t>=47&&t<51)?pulse(t,47,.6,49.3,.8):0);
+  P[9].pivots.forEach((pv,i)=>pv.rotation.x=-1.9*sa*(i?1:.92));
+  // bandeja
+  tray.visible = t>=35;
+  if(tray.visible) tray.position.y=.255+2.6*(1-bounceOut(clamp((t-35)/1.1)));
+  // foco del recorrido de componentes
+  const fAmt=pulse(t,9,.4,30.6,.4), fN=PARTS[tourIndex(t)].n;
+  state.focus=t>=9&&t<31?fN:0; state.focusAmt=fAmt;
+  const k=1-Math.exp(-dt*8);
+  const pulseGlow=.18+.1*Math.sin(t*6);
+  for(const n in P){
+    const p=P[n]; const target= 1-fAmt*(+n===fN?0:.84);
+    p.op = dt>0 ? lerp(p.op,target,k) : target;
+    const em = (+n===fN)?fAmt*pulseGlow:0;
+    p.mats.forEach(m=>{
+      const tr=p.op<.995;
+      if(m.transparent!==tr){m.transparent=tr;m.needsUpdate=true;}
+      m.opacity=p.op; m.depthWrite=p.op>.5;
+      m.emissive.copy(m.userData.baseEm).lerp(accent,em); m.emissiveIntensity=1;
+    });
+  }
+  state.labels = (t>=5&&t<35)?clamp((e-.55)/.4):0;
+
+  // inclinación
+  let pitch=0, roll=0;
+  if(t>=35&&t<39.2){const env=pulse(t,35.5,.4,38.3,.6);pitch=8*DEG*Math.sin(2*Math.PI*(t-35.9)/1.9)*env;roll=4*DEG*Math.sin(2*Math.PI*(t-35.9)/2.7)*env;}
+  const figOn=t>=47;
+  let wob;
+  if(!figOn){
+    eul.set(roll,0,pitch); Qw.setFromEuler(eul);
+    product.position.set(0,0,0); product.quaternion.copy(Qw);
+  }
+  // figura
+  fig.visible=figOn;
+  const fo=ramp(t,47,1.4);
+  figMats.forEach(m=>{m.opacity=fo;m.depthWrite=fo>.4;});
+  if(figOn){
+    const r=rootAt(t), w=r.walk;
+    pitch=w*(4.5*DEG*Math.sin(2*r.phase)+1.5*DEG*Math.sin(r.phase*.5));
+    roll=w*3.5*DEG*Math.sin(r.phase);
+    eul.set(roll,0,pitch); Qw.setFromEuler(eul);
+    const ins=1.7*(1-sm((t-47.5)/1.5));
+    poseFigure(t,Qw,ins);
+    fig.updateMatrixWorld(true);
+    anchor.getWorldPosition(product.position);
+    anchor.getWorldQuaternion(product.quaternion);
+  }
+  Qinv.copy(Qw).invert();
+  tilt.quaternion.copy(Qid).slerp(Qinv,.96);
+  state.pitch=pitch/DEG; state.tray=pitch*.04/DEG;
+  // restaurante y estudio
+  const ro=ramp(t,48,2.2);
+  rest.visible=ro>0; restMats.forEach(m=>{m.opacity=ro;m.depthWrite=ro>.4;});
+  const so=1-ramp(t,47,1.5);
+  studio.visible=so>0; shadowM.opacity=.38*so; ringM.opacity=.22*so; ring2M.opacity=.1*so;
+  // flechas de carga
+  const ao=pulse(t,53,.6,59.4,.6);
+  arrows.forEach(a=>a.visible=ao>0); arrowM.opacity=.95*ao;
+  if(ao>0){
+    const L=v=>fig.localToWorld(v);
+    const e0=V3(ANCH.x-1.2,ANCH.y,ANCH.z);
+    const pw=product.position;
+    setArrow(arrows[0],pw.clone().add(V3(0,3.2,0)),pw.clone().add(V3(0,1.3,0)));
+    setArrow(arrows[1],L(V3(ANCH.x+1.3,ANCH.y-1.1,ANCH.z-.9)),L(V3(e0.x-.2,e0.y-1.1,e0.z-.9)));
+    setArrow(arrows[2],L(V3(e0.x-.3,e0.y,e0.z-1.1)),L(V3(-.2,13.4,-2.9)));
+  }
+  setShadow(t<48?4.5:18);
+}
+
+// ---------------------------------------------------------------- camera
+function sph(r,az,el,tg){r*=fit;return {p:V3(tg.x+r*Math.cos(el)*Math.cos(az),tg.y+r*Math.sin(el),tg.z+r*Math.cos(el)*Math.sin(az)),tg};}
+function gCam(t){
+  const r=rootAt(t), o=V3(Math.cos(r.a),0,Math.sin(r.a)), d=V3(-Math.sin(r.a),0,Math.cos(r.a));
+  const anc=ANCH.clone().applyAxisAngle(UP,r.head).add(r.pos);
+  const k1=ramp(t,59,3), k2=ramp(t,66.5,4.5);
+  const off=o.clone().multiplyScalar(lerp(9,21,k1)).addScaledVector(d,lerp(5,9,k1)).multiplyScalar(fit);
+  off.y=lerp(1.6,3.5,k1);
+  const p=anc.clone().add(off), tg=anc.clone().add(V3(0,lerp(-1.2,-3.5,k1),0));
+  p.lerp(V3(CEN.x+30*fit,FLOOR+30,CEN.z-34*fit),k2);
+  tg.lerp(V3(CEN.x,FLOOR+6,CEN.z),k2);
+  return {p,tg};
+}
+function camDesired(t){
+  if(t<5) return sph(6.8,lerp(-2.05,-.95,sm(t/5)),.36,V3(0,.1,0));
+  if(t<9) return sph(12.5,-.95+.12*(t-5)/4,.24,V3(0,2.1,0));
+  if(t<31){const c=anchorWorld(PARTS[tourIndex(t)].n);return sph(8.6,lerp(-1.3,-.5,(t-9)/22),.3,V3(c.x*.5,lerp(2.1,c.y,.6),c.z*.5));}
+  if(t<35) return sph(7,-.75,.38,V3(0,.2,0));
+  if(t<39) return sph(6.4,-1.52,.12,V3(0,.55,0));
+  if(t<43) return sph(5.4,-1.12,.3,V3(.8,0,0));
+  if(t<47) return sph(5.6,-.8,.82,V3(0,.2,0));
+  if(t<52){const a=sph(5.6,-.8,.82,V3(0,.2,0)), b=gCam(52), k=sm((t-47)/4.2);return {p:a.p.lerp(b.p,k),tg:a.tg.lerp(b.tg,k)};}
+  return gCam(t);
+}
+const camP=new THREE.Vector3(), camT=new THREE.Vector3();
+let camInit=false;
+function updateCamera(t,dt){
+  if(!autoCam){controls.update();return;}
+  const d=camDesired(t);
+  if(!camInit){camP.copy(d.p);camT.copy(d.tg);camInit=true;}
+  else{const k=1-Math.exp(-dt*(t>=52?6:3.2));camP.lerp(d.p,k);camT.lerp(d.tg,k);}
+  camera.position.copy(camP); camera.lookAt(camT); controls.target.copy(camT);
+  key.target.position.copy(camT);
+  const ks=t<48?1:3;
+  key.position.copy(camT).add(V3(4.5*ks,11*ks,-6*ks));
+  rim.target.position.copy(camT); rim.position.copy(camT).add(V3(-6,4,7));
+}
+
+// ---------------------------------------------------------------- labels
+const labelsEl=document.getElementById('labels');
+const lines=document.getElementById('lines'), lctx=lines.getContext('2d');
+const lblEls={};
+PARTS.forEach(p=>{const d=document.createElement('div');d.className='lbl';d.innerHTML=`<span class="n">${String(p.n).padStart(2,'0')}</span><span class="t">${p.short}</span>`;labelsEl.appendChild(d);lblEls[p.n]=d;});
+let W=1,H=1,dpr=1,topSafe=100,botSafe=200;
+const sideMemo={};
+function updateLabels(){
+  lctx.clearRect(0,0,lines.width,lines.height);
+  const a=state.labels;
+  labelsEl.style.opacity=a;
+  if(a<=.01) return;
+  const compact=W<700;
+  const pts=PARTS.map(p=>{const v=anchorWorld(p.n).project(camera);return {n:p.n,x:(v.x+1)/2*W,y:(1-v.y)/2*H};});
+  const mx=pts.reduce((s,p)=>s+p.x,0)/pts.length;
+  lctx.save(); lctx.scale(dpr,dpr); lctx.globalAlpha=a;
+  if(compact){
+    pts.forEach(p=>{const el=lblEls[p.n];el.className='lbl compact'+(state.focus===p.n?' on':state.focus?' dim':'');el.style.transform=`translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;});
+    lctx.restore(); return;
+  }
+  const cols={L:[],R:[]};
+  pts.forEach(p=>{let s=sideMemo[p.n]; if(!s||(s==='L'&&p.x>mx+40)||(s==='R'&&p.x<mx-40)) s=p.x<mx?'L':'R'; sideMemo[p.n]=s; cols[s].push(p);});
+  const relax=(arr)=>{arr.sort((a,b)=>a.y-b.y);arr.forEach(p=>p.ly=clamp(p.y,topSafe,H-botSafe));
+    for(let i=1;i<arr.length;i++)arr[i].ly=Math.max(arr[i].ly,arr[i-1].ly+26);
+    for(let i=arr.length-1;i>=0;i--){const lim=(i===arr.length-1)?H-botSafe:arr[i+1].ly-26;arr[i].ly=Math.min(arr[i].ly,lim);}};
+  relax(cols.L); relax(cols.R);
+  const lx=Math.max(16+180,Math.min(...cols.L.map(p=>p.x),1e9)-70);
+  const rx=Math.min(W-16-180,Math.max(...cols.R.map(p=>p.x),-1e9)+70);
+  const draw=(p,side)=>{
+    const on=state.focus===p.n, dim=state.focus&&!on;
+    const el=lblEls[p.n]; el.className='lbl'+(side==='L'?' right':'')+(on?' on':'')+(dim?' dim':'');
+    const X=side==='L'?lx:rx;
+    el.style.transform=side==='L'?`translate(${X}px,${p.ly}px) translate(-100%,-50%)`:`translate(${X}px,${p.ly}px) translate(0,-50%)`;
+    lctx.globalAlpha=a*(dim?.3:1);
+    lctx.strokeStyle=on?'#ffb547':'rgba(230,236,243,.55)'; lctx.lineWidth=1;
+    lctx.beginPath(); lctx.moveTo(p.x,p.y);
+    const kx=side==='L'?X+22:X-22; lctx.lineTo(kx,p.ly); lctx.lineTo(side==='L'?X+4:X-4,p.ly); lctx.stroke();
+    lctx.fillStyle=on?'#ffb547':'#e6ecf3'; lctx.beginPath(); lctx.arc(p.x,p.y,3,0,Math.PI*2); lctx.fill();
+  };
+  cols.L.forEach(p=>draw(p,'L')); cols.R.forEach(p=>draw(p,'R'));
+  lctx.restore();
+}
+
+// ---------------------------------------------------------------- UI
+const $=id=>document.getElementById(id);
+const scrub=$('scrub'), timeEl=$('time'), capEl=$('caption'), chapTitle=$('chapTitle');
+const card=$('card'), hud=$('hud'), readout=$('readout'), drawer=$('drawer'), specBtn=$('specBtn');
+const chapNav=$('chapters'), ticks=$('ticks');
+const fmt=s=>{s=Math.floor(s);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
+CH.forEach((c,i)=>{
+  const b=document.createElement('button');b.className='chap';b.innerHTML=`<span class="k">${c.k}</span>${c.name}`;
+  b.addEventListener('click',()=>{t=c.t+.01;});chapNav.appendChild(b);c.btn=b;
+  if(i>0){const tk=document.createElement('i');tk.style.left=(c.t/TOTAL*100)+'%';ticks.appendChild(tk);}
+});
+let t=reduce?6.5:0, playing=!reduce, scrubbing=false;
+const playBtn=$('play');
+function setPlaying(v){playing=v;$('icoPause').style.display=v?'':'none';$('icoPlay').style.display=v?'none':'';playBtn.setAttribute('aria-label',v?'Pausar':'Reproducir');}
+setPlaying(playing);
+playBtn.addEventListener('click',()=>setPlaying(!playing));
+scrub.addEventListener('input',()=>{t=+scrub.value;});
+scrub.addEventListener('pointerdown',()=>scrubbing=true);
+addEventListener('pointerup',()=>scrubbing=false);
+addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='BUTTON'&&e.target.tagName!=='INPUT'){e.preventDefault();setPlaying(!playing);}});
+specBtn.addEventListener('click',()=>{drawer.hidden=!drawer.hidden;specBtn.setAttribute('aria-expanded',String(!drawer.hidden));});
+
+let lastCap=null,lastChap=null,lastCard=0;
+function updateUI(t){
+  scrub.value=t; scrub.style.setProperty('--p',(t/TOTAL*100)+'%');
+  timeEl.textContent=fmt(t)+' / '+fmt(TOTAL);
+  let ci=0; CH.forEach((c,i)=>{if(t>=c.t)ci=i;});
+  if(ci!==lastChap){lastChap=ci;chapTitle.textContent=CH[ci].name;CH.forEach((c,i)=>c.btn.classList.toggle('on',i===ci));}
+  const cap=(CAPS.find(c=>t>=c[0]&&t<c[1])||CAPS[0])[2];
+  const inTour=t>=9&&t<31;
+  const capText=inTour?`Componente ${tourIndex(t)+1} de 11 · ${PARTS[tourIndex(t)].short}`:cap;
+  if(capText!==lastCap){lastCap=capText;capEl.textContent=capText;}
+  card.hidden=!inTour;
+  if(inTour){const p=PARTS[tourIndex(t)]; if(p.n!==lastCard){lastCard=p.n;
+    $('cNum').textContent=String(p.n).padStart(2,'0'); $('cCount').textContent=`${p.n} / 11`;
+    $('cName').textContent=p.name; $('cMat').textContent=p.mat; $('cMatRow').hidden=!p.mat;
+    $('cFn').textContent=p.fn; $('cSpec').textContent=p.spec; $('cSpecRow').hidden=!p.spec;}}
+  const showHud=(t>=35.3&&t<39)||(t>=59.5&&t<67);
+  hud.hidden=!showHud||!drawer.hidden;
+  if(showHud){
+    $('vArm').textContent=(state.pitch>=0?'+':'')+state.pitch.toFixed(1)+'°';
+    $('vTray').textContent=(state.tray>=0?'+':'')+state.tray.toFixed(1)+'°';
+    $('gArm').style.transform=`rotate(${-state.pitch*2}deg)`;
+    $('gTray').style.transform=`rotate(${-state.tray*2}deg)`;
+  }
+  readout.hidden=!(t>=39&&t<43)||!drawer.hidden;
+  if(!readout.hidden)$('vLen').textContent=state.len;
+}
+
+function resize(){
+  const r=app.getBoundingClientRect(); W=r.width; H=r.height; dpr=Math.min(devicePixelRatio,2);
+  renderer.setSize(W,H,false); camera.aspect=W/H; camera.updateProjectionMatrix();
+  lines.width=W*dpr; lines.height=H*dpr;
+  const asp=W/H; fit=asp<1.25?Math.pow(1.25/asp,.9):1;
+  topSafe=document.querySelector('.top').getBoundingClientRect().bottom+14;
+  botSafe=H-document.querySelector('.bar').getBoundingClientRect().top+14;
+}
+addEventListener('resize',resize); resize();
+
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  if(playing&&!scrubbing){t+=dt;if(t>=TOTAL){t=0;camInit=false;}}
+  applyState(t,dt);
+  updateCamera(t,dt);
+  updateUI(t);
+  renderer.render(scene,camera);
+  updateLabels();
+  requestAnimationFrame(frame);
+}
+applyState(t,0); requestAnimationFrame(frame);
+})();
+</script>
